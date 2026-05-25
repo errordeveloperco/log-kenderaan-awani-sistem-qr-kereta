@@ -34,7 +34,7 @@
         <div id="loading-overlay" class="absolute inset-0 bg-white bg-opacity-70 z-40 flex items-center justify-center hidden">
             <div class="text-center">
                 <i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-600 mb-2"></i>
-                <p class="text-sm font-medium text-gray-600">Memproses data...</p>
+                <p class="text-sm font-medium text-gray-600">Menyemak status kenderaan...</p>
             </div>
         </div>
         
@@ -68,12 +68,12 @@
 
         <div id="view-scanner" class="view-section hidden flex flex-col items-center justify-center h-full">
             <h2 class="text-xl font-bold mb-2">Imbas QR Kenderaan</h2>
-            <p class="text-sm text-gray-500 mb-6 text-center">Anda juga boleh imbas QR menggunakan kamera biasa telefon anda.</p>
+            <p class="text-sm text-gray-500 mb-6 text-center">Imbas kod QR pada kenderaan untuk Mula atau Tamat perjalanan.</p>
             
             <div id="reader" class="w-full max-w-sm bg-black rounded-lg shadow-lg overflow-hidden mb-4" style="min-height: 250px;"></div>
             
             <div class="flex gap-2 w-full max-w-sm">
-                <button id="btn-start-scan" class="flex-1 bg-blue-600 text-white py-2 rounded shadow hover:bg-blue-700">Mula Kamera Dalam Web</button>
+                <button id="btn-start-scan" class="flex-1 bg-blue-600 text-white py-2 rounded shadow hover:bg-blue-700">Mula Kamera Web</button>
                 <button id="btn-stop-scan" class="flex-1 bg-red-600 text-white py-2 rounded shadow hover:bg-red-700 hidden">Henti Kamera</button>
             </div>
         </div>
@@ -127,7 +127,7 @@
                     <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition shadow">
                         Simpan ke Google Sheets
                     </button>
-                    <button type="button" onclick="window.location.href=window.location.pathname" class="w-full mt-2 bg-gray-200 text-gray-800 font-medium py-2 px-4 rounded-md hover:bg-gray-300 transition">
+                    <button type="button" onclick="cancelAndHome()" class="w-full mt-2 bg-gray-200 text-gray-800 font-medium py-2 px-4 rounded-md hover:bg-gray-300 transition">
                         Batal & Kembali
                     </button>
                 </form>
@@ -137,7 +137,7 @@
         <div id="view-generator" class="view-section hidden">
             <div class="bg-white p-5 rounded-lg shadow-md max-w-md mx-auto text-center">
                 <h2 class="text-lg font-bold mb-4">Jana Kod QR Kenderaan</h2>
-                <p class="text-sm text-gray-500 mb-4">Masukkan No Plat untuk menjana kod QR web unik kenderaan anda.</p>
+                <p class="text-sm text-gray-500 mb-4">Masukkan No Plat untuk menjana kod QR unik kenderaan anda.</p>
                 
                 <input type="text" id="gen-plate-no" placeholder="Cth: WAA1234" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4 uppercase">
                 <button onclick="generateQR()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 w-full mb-6">Jana Kod QR</button>
@@ -187,7 +187,6 @@
         let allTrips = [];
         let qrcodeInstance = null;
 
-        // Custom Modal UI
         window.showModal = (title, message, type = 'info') => {
             document.getElementById('modal-title').innerText = title;
             document.getElementById('modal-message').innerText = message;
@@ -206,6 +205,11 @@
             else overlay.classList.add('hidden');
         };
 
+        window.cancelAndHome = () => {
+            window.history.pushState({}, document.title, window.location.pathname);
+            switchView('dashboard');
+        };
+
         window.switchView = (viewName) => {
             if(viewName !== 'scanner' && html5QrCode && html5QrCode.isScanning) {
                 html5QrCode.stop().catch(err => console.error(err));
@@ -219,7 +223,6 @@
                 if(btn.dataset.target === viewName) { btn.classList.add('tab-active'); btn.classList.remove('tab-inactive'); }
             });
             
-            // JANGAN fetchTrips di sini jika borang sedang dibuka melalui parameter URL
             const urlParams = new URLSearchParams(window.location.search);
             if(viewName === 'dashboard' && !urlParams.get('plat')) {
                 fetchTrips();
@@ -234,14 +237,16 @@
             try {
                 const response = await fetch(SCRIPT_URL);
                 const data = await response.json();
-                data.reverse();
+                
                 window.allTrips = data;
-                window.activeTrips = data.filter(t => t.status === 'ongoing');
+                // Pastikan padanan perbandingan adalah tulisan kecil sekata (lowercase)
+                window.activeTrips = data.filter(t => t.status.toLowerCase().trim() === 'ongoing');
+                
                 updateDashboardUI(data);
-                return data; // Return untuk digunakan oleh fungsi autoload
+                return data;
             } catch (error) {
                 console.error("Error:", error);
-                document.getElementById('trips-list').innerHTML = '<li class="p-4 text-center text-red-500 text-sm">Gagal memuatkan data.</li>';
+                document.getElementById('trips-list').innerHTML = '<li class="p-4 text-center text-red-500 text-sm">Gagal memuatkan data dari Google Sheets.</li>';
             } finally {
                 if(syncIcon) syncIcon.classList.remove('fa-spin');
             }
@@ -269,7 +274,7 @@
             trips.forEach(trip => {
                 const li = document.createElement('li');
                 li.className = "p-4 hover:bg-gray-50 transition";
-                const isOngoing = trip.status === 'ongoing';
+                const isOngoing = trip.status.toLowerCase().trim() === 'ongoing';
                 const statusBadge = isOngoing 
                     ? `<span class="bg-yellow-100 text-yellow-800 text-xs font-semibold px-2 py-0.5 rounded ml-2">Sedang Jalan</span>`
                     : `<span class="bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded ml-2">Selesai</span>`;
@@ -299,7 +304,6 @@
                         document.getElementById('btn-start-scan').classList.remove('hidden');
                         document.getElementById('btn-stop-scan').classList.add('hidden');
                         
-                        // Ekstrak No Plat jika QR mengandungi URL
                         let detectedPlate = decodedText;
                         if(decodedText.includes('?plat=')) {
                             const url = new URL(decodedText);
@@ -326,12 +330,16 @@
 
         window.handleQRScan = (vehicleId) => {
             if(!vehicleId) return;
-            const existingTrip = activeTrips.find(t => t.vehicleId === vehicleId && t.status === 'ongoing');
+            vehicleId = vehicleId.trim().toUpperCase();
+            
+            // Cari rekod ongoing yang sepadan dengan No Plat Kenderaan (Huruf Besar Sekata)
+            const existingTrip = activeTrips.find(t => t.vehicleId.toUpperCase().trim() === vehicleId && t.status.toLowerCase().trim() === 'ongoing');
 
             document.getElementById('tf-vehicle-id').value = vehicleId;
             document.getElementById('form-vehicle-id').innerText = `ID Kenderaan: ${vehicleId}`;
 
             if (existingTrip) {
+                // MOD TAMAT PERJALANAN (Wujud rekod ongoing)
                 document.getElementById('form-title').innerText = "Tamat Perjalanan";
                 document.getElementById('lbl-odometer').innerText = `Odometer SELEPAS Guna (Mula tadi: ${existingTrip.startOdometer} km)`;
                 document.getElementById('tf-action-type').value = "end";
@@ -341,6 +349,7 @@
                 document.getElementById('tf-purpose').removeAttribute('required');
                 document.getElementById('tf-destination').removeAttribute('required');
             } else {
+                // MOD MULA PERJALANAN
                 document.getElementById('form-title').innerText = "Mula Perjalanan";
                 document.getElementById('lbl-odometer').innerText = "Bacaan Odometer SEBELUM Guna (km)";
                 document.getElementById('tf-action-type').value = "start";
@@ -356,7 +365,6 @@
             document.getElementById('tf-destination').value = '';
             document.getElementById('tf-notes').value = '';
 
-            // Buka View Borang
             document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
             document.getElementById('view-trip-form').classList.remove('hidden');
         };
@@ -367,7 +375,7 @@
 
             const payload = {
                 action: document.getElementById('tf-action-type').value,
-                vehicleId: document.getElementById('tf-vehicle-id').value,
+                vehicleId: document.getElementById('tf-vehicle-id').value.toUpperCase(),
                 odometer: document.getElementById('tf-odometer').value,
                 tripId: document.getElementById('tf-trip-id').value,
                 purpose: document.getElementById('tf-purpose').value,
@@ -388,14 +396,15 @@
                 
                 if(result.status === 'success') {
                     showModal("Berjaya", "Data berjaya disimpan!", "success");
-                    // Buang parameter URL jika ada, dan kembali ke Dashboard
+                    // Cuci URL parameter supaya pautan bersih semula (?plat= dibuang)
                     window.history.pushState({}, document.title, window.location.pathname);
-                    fetchTrips().then(() => switchView('dashboard'));
+                    await fetchTrips();
+                    switchView('dashboard');
                 } else {
                     showModal("Ralat", result.message, "error");
                 }
             } catch (error) {
-                showModal("Ralat", "Ralat sambungan.", "error");
+                showModal("Ralat", "Ralat sambungan ke Google Sheets.", "error");
             } finally {
                 toggleLoading(false);
             }
@@ -406,46 +415,35 @@
             if(!plateNo) { showModal("Ralat", "Sila masukkan No. Plat.", "error"); return; }
             
             const displayDiv = document.getElementById('qrcode-display');
+            displayDiv.innerHTML = ''; // Pastikan div dikosongkan dahulu
             displayDiv.classList.remove('hidden');
 
-            // --- PERUBAHAN UTAMA DI SINI ---
-            // Jadikan QR Code tersebut sebagai URL Web anda + No Plat
             const baseURL = window.location.origin + window.location.pathname;
             const smartURL = baseURL + "?plat=" + encodeURIComponent(plateNo);
 
-            if (!qrcodeInstance) {
-                qrcodeInstance = new QRCode(displayDiv, { 
-                    text: smartURL, 
-                    width: 200, height: 200, 
-                    correctLevel : QRCode.CorrectLevel.M 
-                });
-            } else {
-                qrcodeInstance.clear();
-                qrcodeInstance.makeCode(smartURL);
-            }
+            new QRCode(displayDiv, { 
+                text: smartURL, 
+                width: 200, 
+                height: 200, 
+                correctLevel : QRCode.CorrectLevel.M 
+            });
 
             const label = document.getElementById('qr-label');
             label.innerText = plateNo; label.classList.remove('hidden');
         };
 
-        // KAWALAN AUTOLOAD APABILA WEB DIBUKA
         window.addEventListener('DOMContentLoaded', async () => {
             initScanner();
             
-            // Semak jika pengguna masuk melalui Imbasan Kamera Biasa
             const urlParams = new URLSearchParams(window.location.search);
             const scannedPlate = urlParams.get('plat');
 
             if (scannedPlate) {
-                // Tunjuk loading sementara ia menyemak sama ada kenderaan tersebut sedang digunakan atau tidak
                 toggleLoading(true);
-                await fetchTrips(); 
+                await fetchTrips(); // Muat turun senarai terkini untuk tahu ada status 'ongoing' atau tidak
                 toggleLoading(false);
-                
-                // Terus buka borang
                 handleQRScan(scannedPlate.toUpperCase());
             } else {
-                // Mod Biasa
                 switchView('dashboard');
             }
         });
