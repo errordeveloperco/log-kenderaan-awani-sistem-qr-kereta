@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Log Perjalanan Kenderaan (Google Sheets)</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- HTML5 QR Code Scanner -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    
+    <!-- QRCode Generator -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .tab-active { color: #2563eb; border-bottom: 2px solid #2563eb; }
+        .tab-inactive { color: #6b7280; }
+        #reader video { object-fit: cover; border-radius: 0.5rem; }
+    </style>
+</head>
+<body class="bg-gray-50 h-screen flex flex-col text-gray-800">
+
+    <!-- Header -->
+    <header class="bg-blue-600 text-white p-4 shadow-md flex justify-between items-center shrink-0">
+        <h1 class="text-xl font-bold"><i class="fa-solid fa-car-side mr-2"></i> Log Kenderaan Awani</h1>
+        <button onclick="fetchTrips()" class="text-xs bg-blue-700 hover:bg-blue-800 px-3 py-1.5 rounded-md flex items-center transition">
+            <i class="fa-solid fa-sync mr-1" id="sync-icon"></i> Segarkan
+        </button>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto p-4 relative" id="main-content">
+        
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="absolute inset-0 bg-white bg-opacity-70 z-40 flex items-center justify-center hidden">
+            <div class="text-center">
+                <i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-600 mb-2"></i>
+                <p class="text-sm font-medium text-gray-600">Memproses data...</p>
+            </div>
+        </div>
+        
+        <!-- VIEW: DASHBOARD -->
+        <div id="view-dashboard" class="view-section hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold">Rekod Perjalanan Aktif</h2>
+            </div>
+
+            <!-- Active Trip Alert -->
+            <div id="active-trip-container" class="hidden mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded shadow-sm">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <i class="fa-solid fa-route text-yellow-400"></i>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-yellow-700 font-bold">
+                            Perjalanan Sedang Berlangsung!
+                        </p>
+                        <p class="text-xs text-yellow-600 mt-1" id="active-trip-details">
+                            Kenderaan: -, Mula: -
+                        </p>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <button onclick="switchView('scanner')" class="text-sm bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded shadow">
+                        Imbas QR untuk Tamat Perjalanan
+                    </button>
+                </div>
+            </div>
+
+            <!-- Trips List -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <ul id="trips-list" class="divide-y divide-gray-200">
+                    <li class="p-4 text-center text-gray-500 text-sm">Memuatkan rekod dari Google Sheets...</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- VIEW: SCANNER -->
+        <div id="view-scanner" class="view-section hidden flex flex-col items-center justify-center h-full">
+            <h2 class="text-xl font-bold mb-2">Imbas QR Kenderaan</h2>
+            <p class="text-sm text-gray-500 mb-6 text-center">Imbas kod QR pada kenderaan untuk Mula atau Tamat perjalanan.</p>
+            
+            <div id="reader" class="w-full max-w-sm bg-black rounded-lg shadow-lg overflow-hidden mb-4" style="min-height: 250px;"></div>
+            
+            <div class="flex gap-2 w-full max-w-sm">
+                <button id="btn-start-scan" class="flex-1 bg-blue-600 text-white py-2 rounded shadow hover:bg-blue-700">Mula Kamera</button>
+                <button id="btn-stop-scan" class="flex-1 bg-red-600 text-white py-2 rounded shadow hover:bg-red-700 hidden">Henti Kamera</button>
+            </div>
+
+            <button onclick="handleQRScan('KENDERAAN-WAA1234')" class="mt-8 text-xs text-gray-400 underline decoration-dotted">
+                Simulasi Imbasan QR (Ujian No Plat WAA1234)
+            </button>
+        </div>
+
+        <!-- VIEW: TRIP FORM -->
+        <div id="view-trip-form" class="view-section hidden">
+            <div class="bg-white p-5 rounded-lg shadow-md max-w-md mx-auto">
+                <div class="flex items-center mb-4 text-blue-600">
+                    <i class="fa-solid fa-car text-2xl mr-3"></i>
+                    <div>
+                        <h2 class="text-lg font-bold" id="form-title">Mula Perjalanan</h2>
+                        <p class="text-xs text-gray-500" id="form-vehicle-id">ID Kenderaan: -</p>
+                    </div>
+                </div>
+
+                <form id="trip-form" onsubmit="submitTrip(event)">
+                    <input type="hidden" id="tf-vehicle-id">
+                    <input type="hidden" id="tf-trip-id">
+                    <input type="hidden" id="tf-action-type">
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1" id="lbl-odometer">Bacaan Odometer Semasa (km)</label>
+                        <input type="number" id="tf-odometer" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+
+                    <!-- Fields only for START trip -->
+                    <div id="fields-start" class="hidden">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Tujuan Perjalanan</label>
+                            <input type="text" id="tf-purpose" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Cth: Penghantaran Barang">
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Destinasi</label>
+                            <input type="text" id="tf-destination" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Cth: Tapak Projek B">
+                        </div>
+                    </div>
+
+                    <!-- Fields only for END trip -->
+                    <div id="fields-end" class="hidden">
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Keadaan Kenderaan Selepas Guna</label>
+                            <select id="tf-condition" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="Baik">Baik (Tiada Isu)</option>
+                                <option value="Perlu Servis">Perlu Servis / Pemeriksaan</option>
+                                <option value="Kerosakan">Terdapat Kerosakan</option>
+                            </select>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nota/Catatan Tambahan</label>
+                            <textarea id="tf-notes" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Cth: Isi minyak penuh, bunyi bising pada brek..."></textarea>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition shadow">
+                        Simpan ke Google Sheets
+                    </button>
+                    <button type="button" onclick="switchView('dashboard')" class="w-full mt-2 bg-gray-200 text-gray-800 font-medium py-2 px-4 rounded-md hover:bg-gray-300 transition">
+                        Batal
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- VIEW: VEHICLE QR GENERATOR -->
+        <div id="view-generator" class="view-section hidden">
+            <div class="bg-white p-5 rounded-lg shadow-md max-w-md mx-auto text-center">
+                <h2 class="text-lg font-bold mb-4">Jana Kod QR Kenderaan</h2>
+                <p class="text-sm text-gray-500 mb-4">Masukkan No Plat untuk menjana kod QR unik kenderaan anda.</p>
+                
+                <input type="text" id="gen-plate-no" placeholder="Cth: WAA1234" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4 uppercase">
+                <button onclick="generateQR()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 w-full mb-6">Jana Kod QR</button>
+
+                <div id="qrcode-display" class="flex justify-center mb-4 p-4 bg-gray-50 rounded hidden"></div>
+                <p id="qr-label" class="font-bold text-lg mb-4 hidden"></p>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bg-white border-t border-gray-200 flex justify-around shrink-0 pb-safe">
+        <button onclick="switchView('dashboard')" class="nav-btn tab-active flex-1 py-3 flex flex-col items-center" data-target="dashboard">
+            <i class="fa-solid fa-list-ul text-lg mb-1"></i>
+            <span class="text-xs font-medium">Rekod</span>
+        </button>
+        <button onclick="switchView('scanner')" class="nav-btn tab-inactive flex-1 py-3 flex flex-col items-center relative" data-target="scanner">
+            <div class="absolute -top-4 bg-blue-600 text-white w-12 h-12 rounded-full flex items-center justify-center shadow-lg border-4 border-gray-50">
+                <i class="fa-solid fa-qrcode text-xl"></i>
+            </div>
+            <span class="text-xs font-medium mt-6">Imbas QR</span>
+        </button>
+        <button onclick="switchView('generator')" class="nav-btn tab-inactive flex-1 py-3 flex flex-col items-center" data-target="generator">
+            <i class="fa-solid fa-car text-lg mb-1"></i>
+            <span class="text-xs font-medium">Kenderaan</span>
+        </button>
+    </nav>
+
+    <!-- Custom Modal -->
+    <div id="custom-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-sm w-full p-5 transform transition-all">
+            <div class="text-center mb-4" id="modal-icon"></div>
+            <h3 class="text-lg font-bold text-center mb-2" id="modal-title">Tajuk</h3>
+            <p class="text-sm text-gray-600 text-center mb-5" id="modal-message">Mesej</p>
+            <div class="flex justify-center">
+                <button onclick="closeModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // ⚠️ PASTE KAN URL GOOGLE APPS SCRIPT ANDA DI SINI
+        // ==========================================
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzpQ-IvbHif1usAD1Y6bEt0Ly_ARyFARkGnKS3O3VfuVG_k7AqjW4eZNEcxLkDMnpL9gA/exec";
+
+        let html5QrCode;
+        let activeTrips = []; 
+        let allTrips = [];
+
+        // Custom Modal UI
+        window.showModal = (title, message, type = 'info') => {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-message').innerText = message;
+            let iconHtml = '';
+            if(type === 'success') iconHtml = '<i class="fa-solid fa-circle-check text-5xl text-green-500"></i>';
+            else if(type === 'error') iconHtml = '<i class="fa-solid fa-circle-xmark text-5xl text-red-500"></i>';
+            else iconHtml = '<i class="fa-solid fa-circle-info text-5xl text-blue-500"></i>';
+            document.getElementById('modal-icon').innerHTML = iconHtml;
+            document.getElementById('custom-modal').classList.remove('hidden');
+        };
+        window.closeModal = () => document.getElementById('custom-modal').classList.add('hidden');
+
+        // Toggle Loading
+        const toggleLoading = (show) => {
+            const overlay = document.getElementById('loading-overlay');
+            if (show) overlay.classList.remove('hidden');
+            else overlay.classList.add('hidden');
+        };
+
+        // Navigation
+        window.switchView = (viewName) => {
+            if(viewName !== 'scanner' && html5QrCode && html5QrCode.isScanning) {
+                html5QrCode.stop().then(() => {
+                    document.getElementById('btn-start-scan').classList.remove('hidden');
+                    document.getElementById('btn-stop-scan').classList.add('hidden');
+                }).catch(err => console.error(err));
+            }
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`view-${viewName}`).classList.remove('hidden');
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('tab-active'); btn.classList.add('tab-inactive');
+                if(btn.dataset.target === viewName) { btn.classList.add('tab-active'); btn.classList.remove('tab-inactive'); }
+            });
+            if(viewName === 'dashboard') fetchTrips();
+        };
+
+        // Fetch Data from Google Sheets
+        window.fetchTrips = async () => {
+            if(SCRIPT_URL === "SILA_MASUKKAN_URL_WEB_APP_ANDA_DI_SINI") {
+                document.getElementById('trips-list').innerHTML = '<li class="p-4 text-center text-red-500 text-sm">Sila masukkan URL Google Apps Script di dalam kod index.html terlebih dahulu.</li>';
+                return;
+            }
+            
+            const syncIcon = document.getElementById('sync-icon');
+            syncIcon.classList.add('fa-spin');
+
+            try {
+                const response = await fetch(SCRIPT_URL);
+                const data = await response.json();
+                
+                // Urutkan data berdasarkan masa terbaharu di atas
+                data.reverse();
+                
+                window.allTrips = data;
+                window.activeTrips = data.filter(t => t.status === 'ongoing');
+                
+                updateDashboardUI(data);
+            } catch (error) {
+                console.error("Error fetching sheet data:", error);
+                document.getElementById('trips-list').innerHTML = '<li class="p-4 text-center text-red-500 text-sm">Gagal memuatkan data dari Google Sheets. Pastikan deployment Apps Script betul.</li>';
+            } finally {
+                syncIcon.classList.remove('fa-spin');
+            }
+        };
+
+        const updateDashboardUI = (trips) => {
+            const listEl = document.getElementById('trips-list');
+            const activeContainer = document.getElementById('active-trip-container');
+            const activeDetails = document.getElementById('active-trip-details');
+            
+            listEl.innerHTML = '';
+
+            if (activeTrips.length > 0) {
+                activeContainer.classList.remove('hidden');
+                const t = activeTrips[0];
+                activeDetails.innerText = `Kenderaan: ${t.vehicleId} | Mula: ${t.startTime}`;
+            } else {
+                activeContainer.classList.add('hidden');
+            }
+
+            if (trips.length === 0) {
+                listEl.innerHTML = '<li class="p-6 text-center text-gray-500 text-sm">Tiada rekod perjalanan ditemui di Google Sheets.</li>';
+                return;
+            }
+
+            trips.forEach(trip => {
+                const li = document.createElement('li');
+                li.className = "p-4 hover:bg-gray-50 transition";
+                
+                const isOngoing = trip.status === 'ongoing';
+                const statusBadge = isOngoing 
+                    ? `<span class="bg-yellow-100 text-yellow-800 text-xs font-semibold px-2 py-0.5 rounded ml-2">Sedang Jalan</span>`
+                    : `<span class="bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded ml-2">Selesai</span>`;
+
+                li.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="font-bold text-gray-800">${trip.vehicleId} ${statusBadge}</div>
+                        <div class="text-xs text-gray-500">Mula: ${trip.startTime || '-'}</div>
+                    </div>
+                    <div class="text-sm text-gray-600 grid grid-cols-2 gap-2 mb-2">
+                        <div><i class="fa-solid fa-gauge-high w-4 text-gray-400"></i> Odo Mula: ${trip.startOdometer} km</div>
+                        <div><i class="fa-solid fa-flag-checkered w-4 text-gray-400"></i> Odo Tamat: ${trip.endOdometer || '-'} km</div>
+                    </div>
+                    ${!isOngoing ? `<div class="text-xs text-blue-600 font-bold mb-2"><i class="fa-solid fa-road mr-1"></i> Jarak: ${trip.endOdometer - trip.startOdometer} km</div>` : ''}
+                    <div class="text-xs text-gray-500 bg-gray-50 p-2 rounded">
+                        <span class="font-semibold block">Tujuan: ${trip.purpose || '-'}</span>
+                        <span class="block">Destinasi: ${trip.destination || '-'}</span>
+                        ${trip.condition ? `<span class="block text-gray-600 mt-1"><b>Keadaan:</b> ${trip.condition} | <b>Nota:</b> ${trip.notes || '-'}</span>` : ''}
+                    </div>
+                `;
+                listEl.appendChild(li);
+            });
+        };
+
+        // QR Scanner
+        const initScanner = () => {
+            html5QrCode = new Html5Qrcode("reader");
+            document.getElementById('btn-start-scan').addEventListener('click', () => {
+                const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+                html5QrCode.start({ facingMode: "environment" }, config, 
+                    (decodedText) => {
+                        html5QrCode.stop();
+                        document.getElementById('btn-start-scan').classList.remove('hidden');
+                        document.getElementById('btn-stop-scan').classList.add('hidden');
+                        handleQRScan(decodedText.trim().toUpperCase());
+                    },
+                    () => {}
+                ).then(() => {
+                    document.getElementById('btn-start-scan').classList.add('hidden');
+                    document.getElementById('btn-stop-scan').classList.remove('hidden');
+                }).catch(() => {
+                    showModal("Ralat Kamera", "Tidak dapat membuka kamera. Sila semak kebenaran pelayar.", "error");
+                });
+            });
+
+            document.getElementById('btn-stop-scan').addEventListener('click', () => {
+                html5QrCode.stop().then(() => {
+                    document.getElementById('btn-start-scan').classList.remove('hidden');
+                    document.getElementById('btn-stop-scan').classList.add('hidden');
+                });
+            });
+        };
+
+        window.handleQRScan = (vehicleId) => {
+            if(!vehicleId) return;
+            const existingTrip = activeTrips.find(t => t.vehicleId === vehicleId && t.status === 'ongoing');
+
+            document.getElementById('tf-vehicle-id').value = vehicleId;
+            document.getElementById('form-vehicle-id').innerText = `ID Kenderaan: ${vehicleId}`;
+
+            if (existingTrip) {
+                document.getElementById('form-title').innerText = "Tamat Perjalanan";
+                document.getElementById('lbl-odometer').innerText = `Bacaan Odometer SELEPAS Perjalanan (Mula Hari Itu: ${existingTrip.startOdometer} km)`;
+                document.getElementById('tf-action-type').value = "end";
+                document.getElementById('tf-trip-id').value = existingTrip.id;
+                document.getElementById('fields-start').classList.add('hidden');
+                document.getElementById('fields-end').classList.remove('hidden');
+                document.getElementById('tf-purpose').removeAttribute('required');
+                document.getElementById('tf-destination').removeAttribute('required');
+            } else {
+                document.getElementById('form-title').innerText = "Mula Perjalanan";
+                document.getElementById('lbl-odometer').innerText = "Bacaan Odometer SEBELUM Perjalanan (km)";
+                document.getElementById('tf-action-type').value = "start";
+                document.getElementById('tf-trip-id').value = "";
+                document.getElementById('fields-start').classList.remove('hidden');
+                document.getElementById('fields-end').classList.add('hidden');
+                document.getElementById('tf-purpose').setAttribute('required', 'true');
+                document.getElementById('tf-destination').setAttribute('required', 'true');
+            }
+
+            document.getElementById('tf-odometer').value = '';
+            document.getElementById('tf-purpose').value = '';
+            document.getElementById('tf-destination').value = '';
+            document.getElementById('tf-notes').value = '';
+
+            switchView('trip-form');
+        };
+
+        // Form Submission to Google Sheets
+        window.submitTrip = async (e) => {
+            e.preventDefault();
+            if(SCRIPT_URL === "SILA_MASUKKAN_URL_WEB_APP_ANDA_DI_SINI") return;
+
+            toggleLoading(true);
+
+            const payload = {
+                action: document.getElementById('tf-action-type').value,
+                vehicleId: document.getElementById('tf-vehicle-id').value,
+                odometer: document.getElementById('tf-odometer').value,
+                tripId: document.getElementById('tf-trip-id').value,
+                purpose: document.getElementById('tf-purpose').value,
+                destination: document.getElementById('tf-destination').value,
+                condition: document.getElementById('tf-condition').value,
+                notes: document.getElementById('tf-notes').value
+            };
+
+            try {
+                // Hantar data menggunakan Content-Type text/plain untuk mengelakkan isu CORS Preflight OPTIONS di Apps Script
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(payload),
+                    redirect: 'follow'
+                });
+
+                const result = await response.json();
+                
+                if(result.status === 'success') {
+                    showModal("Berjaya", "Data berjaya dikemas kini secara langsung di Google Sheets!", "success");
+                    switchView('dashboard');
+                } else {
+                    showModal("Ralat", result.message || "Gagal menyimpan data.", "error");
+                }
+            } catch (error) {
+                console.error("Error submitting:", error);
+                showModal("Ralat", "Ralat sambungan rangkaian. Sila cuba lagi.", "error");
+            } finally {
+                toggleLoading(false);
+            }
+        };
+
+        // QR Code Generator
+        window.generateQR = () => {
+            const plateNo = document.getElementById('gen-plate-no').value.trim().toUpperCase();
+            if(!plateNo) { showModal("Ralat", "Sila masukkan No. Plat.", "error"); return; }
+            const displayDiv = document.getElementById('qrcode-display');
+            displayDiv.innerHTML = ''; displayDiv.classList.remove('hidden');
+            new QRCode(displayDiv, { text: plateNo, width: 200, height: 200, correctLevel : QRCode.CorrectLevel.H });
+            const label = document.getElementById('qr-label');
+            label.innerText = plateNo; label.classList.remove('hidden');
+        };
+
+        window.addEventListener('DOMContentLoaded', () => {
+            switchView('dashboard');
+            initScanner();
+        });
+    </script>
+</body>
+</html>
