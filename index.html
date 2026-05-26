@@ -3,14 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Log Perjalanan Kenderaan (Google Sheets)</title>
+    <title>Sistem Log Perjalanan Kenderaan (Google Sheets & AI)</title>
     
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
+    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- HTML5 QR Code Scanner -->
     <script src="https://unpkg.com/html5-qrcode"></script>
     
+    <!-- QRCode Generator -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
     <style>
@@ -22,6 +26,7 @@
 </head>
 <body class="bg-gray-50 h-screen flex flex-col text-gray-800">
 
+    <!-- Header -->
     <header class="bg-blue-600 text-white p-4 shadow-md flex justify-between items-center shrink-0">
         <h1 class="text-xl font-bold"><i class="fa-solid fa-car-side mr-2"></i> Log Kenderaan Awani</h1>
         <button onclick="fetchTrips()" class="text-xs bg-blue-700 hover:bg-blue-800 px-3 py-1.5 rounded-md flex items-center transition">
@@ -29,36 +34,46 @@
         </button>
     </header>
 
+    <!-- Main Content Area -->
     <main class="flex-1 overflow-y-auto p-4 relative" id="main-content">
         
+        <!-- Loading Overlay -->
         <div id="loading-overlay" class="absolute inset-0 bg-white bg-opacity-70 z-40 flex items-center justify-center hidden">
             <div class="text-center">
                 <i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-600 mb-2"></i>
-                <p class="text-sm font-medium text-gray-600">Menyemak status kenderaan...</p>
+                <p class="text-sm font-medium text-gray-600">Memproses data...</p>
             </div>
         </div>
         
+        <!-- VIEW: DASHBOARD -->
         <div id="view-dashboard" class="view-section hidden">
             <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-semibold">Rekod Perjalanan Aktif</h2>
+                <h2 class="text-lg font-semibold">Rekod Perjalanan</h2>
             </div>
 
+            <!-- Active Trip Alert -->
             <div id="active-trip-container" class="hidden mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded shadow-sm">
                 <div class="flex items-center">
                     <div class="flex-shrink-0">
-                        <i class="fa-solid fa-route text-yellow-400"></i>
+                        <i class="fa-solid fa-route text-yellow-500 text-xl"></i>
                     </div>
                     <div class="ml-3">
-                        <p class="text-sm text-yellow-700 font-bold">
+                        <p class="text-sm text-yellow-800 font-bold">
                             Perjalanan Sedang Berlangsung!
                         </p>
-                        <p class="text-xs text-yellow-600 mt-1" id="active-trip-details">
+                        <p class="text-xs text-yellow-700 mt-1" id="active-trip-details">
                             Kenderaan: -, Mula: -
                         </p>
                     </div>
                 </div>
+                <div class="mt-4">
+                    <button onclick="goToScannerAndStart()" class="w-full text-sm bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2.5 rounded shadow flex items-center justify-center font-bold transition">
+                        <i class="fa-solid fa-qrcode mr-2"></i> Imbas QR untuk Tamat Perjalanan
+                    </button>
+                </div>
             </div>
 
+            <!-- Trips List -->
             <div class="bg-white rounded-lg shadow overflow-hidden">
                 <ul id="trips-list" class="divide-y divide-gray-200">
                     <li class="p-4 text-center text-gray-500 text-sm">Memuatkan rekod dari Google Sheets...</li>
@@ -66,18 +81,20 @@
             </div>
         </div>
 
+        <!-- VIEW: SCANNER -->
         <div id="view-scanner" class="view-section hidden flex flex-col items-center justify-center h-full">
             <h2 class="text-xl font-bold mb-2">Imbas QR Kenderaan</h2>
-            <p class="text-sm text-gray-500 mb-6 text-center">Imbas kod QR pada kenderaan untuk Mula atau Tamat perjalanan.</p>
+            <p class="text-sm text-gray-500 mb-6 text-center">Imbas kod QR pada kenderaan untuk Memulakan atau Menamatkan perjalanan.</p>
             
             <div id="reader" class="w-full max-w-sm bg-black rounded-lg shadow-lg overflow-hidden mb-4" style="min-height: 250px;"></div>
             
             <div class="flex gap-2 w-full max-w-sm">
-                <button id="btn-start-scan" class="flex-1 bg-blue-600 text-white py-2 rounded shadow hover:bg-blue-700">Mula Kamera Web</button>
-                <button id="btn-stop-scan" class="flex-1 bg-red-600 text-white py-2 rounded shadow hover:bg-red-700 hidden">Henti Kamera</button>
+                <button id="btn-start-scan" class="flex-1 bg-blue-600 text-white py-2.5 rounded shadow hover:bg-blue-700 font-bold">Mula Kamera Web</button>
+                <button id="btn-stop-scan" class="flex-1 bg-red-600 text-white py-2.5 rounded shadow hover:bg-red-700 font-bold hidden">Henti Kamera</button>
             </div>
         </div>
 
+        <!-- VIEW: TRIP FORM -->
         <div id="view-trip-form" class="view-section hidden">
             <div class="bg-white p-5 rounded-lg shadow-md max-w-md mx-auto">
                 <div class="flex items-center mb-4 text-blue-600">
@@ -98,6 +115,7 @@
                         <input type="number" id="tf-odometer" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                     </div>
 
+                    <!-- Fields only for START trip -->
                     <div id="fields-start" class="hidden">
                         <div class="mb-4">
                             <label class="block text-sm font-medium text-gray-700 mb-1">Tujuan Perjalanan</label>
@@ -109,6 +127,7 @@
                         </div>
                     </div>
 
+                    <!-- Fields only for END trip -->
                     <div id="fields-end" class="hidden">
                         <div class="mb-4">
                             <label class="block text-sm font-medium text-gray-700 mb-1">Keadaan Kenderaan Selepas Guna</label>
@@ -124,23 +143,24 @@
                         </div>
                     </div>
 
-                    <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 transition shadow">
+                    <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2.5 px-4 rounded-md hover:bg-blue-700 transition shadow">
                         Simpan ke Google Sheets
                     </button>
-                    <button type="button" onclick="cancelAndHome()" class="w-full mt-2 bg-gray-200 text-gray-800 font-medium py-2 px-4 rounded-md hover:bg-gray-300 transition">
+                    <button type="button" onclick="cancelAndHome()" class="w-full mt-2 bg-gray-200 text-gray-800 font-medium py-2.5 px-4 rounded-md hover:bg-gray-300 transition">
                         Batal & Kembali
                     </button>
                 </form>
             </div>
         </div>
 
+        <!-- VIEW: VEHICLE QR GENERATOR -->
         <div id="view-generator" class="view-section hidden">
             <div class="bg-white p-5 rounded-lg shadow-md max-w-md mx-auto text-center">
                 <h2 class="text-lg font-bold mb-4">Jana Kod QR Kenderaan</h2>
                 <p class="text-sm text-gray-500 mb-4">Masukkan No Plat untuk menjana kod QR unik kenderaan anda.</p>
                 
                 <input type="text" id="gen-plate-no" placeholder="Cth: WAA1234" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4 uppercase">
-                <button onclick="generateQR()" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 w-full mb-6">Jana Kod QR</button>
+                <button onclick="generateQR()" class="bg-blue-600 text-white font-bold px-4 py-2.5 rounded-md hover:bg-blue-700 w-full mb-6">Jana Kod QR</button>
 
                 <div id="qrcode-display" class="flex justify-center mb-4 p-4 bg-gray-50 rounded hidden"></div>
                 <p id="qr-label" class="font-bold text-lg mb-4 hidden"></p>
@@ -149,16 +169,17 @@
 
     </main>
 
-    <nav class="bg-white border-t border-gray-200 flex justify-around shrink-0 pb-safe">
+    <!-- Bottom Navigation -->
+    <nav class="bg-white border-t border-gray-200 flex justify-around shrink-0 pb-safe shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
         <button onclick="switchView('dashboard')" class="nav-btn tab-active flex-1 py-3 flex flex-col items-center" data-target="dashboard">
             <i class="fa-solid fa-list-ul text-lg mb-1"></i>
             <span class="text-xs font-medium">Rekod</span>
         </button>
         <button onclick="switchView('scanner')" class="nav-btn tab-inactive flex-1 py-3 flex flex-col items-center relative" data-target="scanner">
-            <div class="absolute -top-4 bg-blue-600 text-white w-12 h-12 rounded-full flex items-center justify-center shadow-lg border-4 border-gray-50">
-                <i class="fa-solid fa-qrcode text-xl"></i>
+            <div class="absolute -top-5 bg-blue-600 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg border-4 border-gray-50 transition transform hover:scale-105">
+                <i class="fa-solid fa-qrcode text-2xl"></i>
             </div>
-            <span class="text-xs font-medium mt-6">Imbas QR</span>
+            <span class="text-xs font-medium mt-7">Imbas QR</span>
         </button>
         <button onclick="switchView('generator')" class="nav-btn tab-inactive flex-1 py-3 flex flex-col items-center" data-target="generator">
             <i class="fa-solid fa-car text-lg mb-1"></i>
@@ -166,6 +187,7 @@
         </button>
     </nav>
 
+    <!-- Custom Modal -->
     <div id="custom-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-lg shadow-xl max-w-sm w-full p-5 transform transition-all">
             <div class="text-center mb-4" id="modal-icon"></div>
@@ -177,8 +199,26 @@
         </div>
     </div>
 
+    <!-- AI Modal -->
+    <div id="ai-modal" class="fixed inset-0 bg-black bg-opacity-60 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 flex flex-col max-h-[80vh]">
+            <div class="flex justify-between items-center mb-4 border-b pb-3">
+                <h3 class="text-lg font-bold text-purple-700 flex items-center">
+                    <i class="fa-solid fa-wand-magic-sparkles mr-2 text-purple-500"></i> Analisis AI Pintar
+                </h3>
+                <button onclick="closeAIModal()" class="text-gray-400 hover:text-gray-700 transition">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            <div id="ai-content" class="overflow-y-auto text-sm text-gray-700 flex-1 whitespace-pre-wrap leading-relaxed">
+                Memproses data...
+            </div>
+        </div>
+    </div>
+
     <script>
         // ==========================================
+        // URL GOOGLE APPS SCRIPT ANDA
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzpQ-IvbHif1usAD1Y6bEt0Ly_ARyFARkGnKS3O3VfuVG_k7AqjW4eZNEcxLkDMnpL9gA/exec";
         // ==========================================
 
@@ -186,6 +226,9 @@
         let activeTrips = []; 
         let allTrips = [];
         let qrcodeInstance = null;
+        
+        // Kekunci API untuk AI Gemini
+        const apiKey = ""; 
 
         window.showModal = (title, message, type = 'info') => {
             document.getElementById('modal-title').innerText = title;
@@ -197,7 +240,9 @@
             document.getElementById('modal-icon').innerHTML = iconHtml;
             document.getElementById('custom-modal').classList.remove('hidden');
         };
+        
         window.closeModal = () => document.getElementById('custom-modal').classList.add('hidden');
+        window.closeAIModal = () => document.getElementById('ai-modal').classList.add('hidden');
 
         const toggleLoading = (show) => {
             const overlay = document.getElementById('loading-overlay');
@@ -229,6 +274,17 @@
             }
         };
 
+        // BUKA SCANNER SECARA AUTOMATIK
+        window.goToScannerAndStart = () => {
+            switchView('scanner');
+            setTimeout(() => {
+                const btn = document.getElementById('btn-start-scan');
+                if(btn && !btn.classList.contains('hidden')) {
+                    btn.click();
+                }
+            }, 500); 
+        };
+
         window.fetchTrips = async () => {
             if(SCRIPT_URL === "SILA_MASUKKAN_URL_WEB_APP_ANDA_DI_SINI") return;
             const syncIcon = document.getElementById('sync-icon');
@@ -239,8 +295,7 @@
                 const data = await response.json();
                 
                 window.allTrips = data;
-                // Pastikan padanan perbandingan adalah tulisan kecil sekata (lowercase)
-                window.activeTrips = data.filter(t => t.status.toLowerCase().trim() === 'ongoing');
+                window.activeTrips = data.filter(t => t.status.toLowerCase().replace(/\s+/g, '') === 'ongoing');
                 
                 updateDashboardUI(data);
                 return data;
@@ -249,6 +304,58 @@
                 document.getElementById('trips-list').innerHTML = '<li class="p-4 text-center text-red-500 text-sm">Gagal memuatkan data dari Google Sheets.</li>';
             } finally {
                 if(syncIcon) syncIcon.classList.remove('fa-spin');
+            }
+        };
+
+        // FUNGSI API GEMINI AI
+        const callGeminiAPI = async (prompt, retries = 5) => {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                systemInstruction: { parts: [{ text: "Anda adalah pembantu AI automotif yang profesional. Berikan maklum balas analisis dalam Bahasa Melayu. Rangkumkan keadaan kereta dan berikan cadangan keselamatan atau penyelenggaraan berdasarkan nota pemandu." }] }
+            };
+
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) throw new Error(`Ralat HTTP! status: ${response.status}`);
+                    const result = await response.json();
+                    return result.candidates?.[0]?.content?.parts?.[0]?.text || "Tiada analisis dapat dijana.";
+                } catch (error) {
+                    const delay = Math.pow(2, i) * 1000;
+                    await new Promise(res => setTimeout(res, delay));
+                }
+            }
+            throw new Error("Gagal menyambung ke pelayan AI.");
+        };
+
+        window.analyzeTrip = async (tripId) => {
+            const trip = window.allTrips.find(t => t.id === tripId);
+            if (!trip) return;
+
+            document.getElementById('ai-content').innerHTML = `
+                <div class="flex flex-col items-center justify-center py-10">
+                    <i class="fa-solid fa-circle-notch fa-spin text-4xl text-purple-500 mb-4"></i>
+                    <p class="font-medium text-purple-700">Menganalisis laporan perjalanan...</p>
+                </div>`;
+            document.getElementById('ai-modal').classList.remove('hidden');
+
+            let distanceStr = "-";
+            if (trip.startOdometer && trip.endOdometer) {
+                distanceStr = (parseInt(trip.endOdometer) - parseInt(trip.startOdometer)) + " km";
+            }
+            
+            const prompt = `Sila analisis log perjalanan ini:\nKenderaan: ${trip.vehicleId}\nTujuan: ${trip.purpose || '-'}\nJarak: ${distanceStr}\nKeadaan Akhir: ${trip.condition || '-'}\nNota Pemandu: ${trip.notes || 'Tiada'}`;
+
+            try {
+                const response = await callGeminiAPI(prompt);
+                document.getElementById('ai-content').innerText = response;
+            } catch (error) {
+                document.getElementById('ai-content').innerHTML = `<p class="text-red-500 font-medium">Ralat AI: ${error.message}</p>`;
             }
         };
 
@@ -274,21 +381,31 @@
             trips.forEach(trip => {
                 const li = document.createElement('li');
                 li.className = "p-4 hover:bg-gray-50 transition";
-                const isOngoing = trip.status.toLowerCase().trim() === 'ongoing';
+                const isOngoing = trip.status.toLowerCase().replace(/\s+/g, '') === 'ongoing';
                 const statusBadge = isOngoing 
-                    ? `<span class="bg-yellow-100 text-yellow-800 text-xs font-semibold px-2 py-0.5 rounded ml-2">Sedang Jalan</span>`
-                    : `<span class="bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded ml-2">Selesai</span>`;
+                    ? `<span class="bg-yellow-100 text-yellow-800 text-xs font-semibold px-2 py-0.5 rounded ml-2 shadow-sm">Sedang Jalan</span>`
+                    : `<span class="bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded ml-2 shadow-sm">Selesai</span>`;
 
                 li.innerHTML = `
                     <div class="flex items-center justify-between mb-2">
                         <div class="font-bold text-gray-800">${trip.vehicleId} ${statusBadge}</div>
                         <div class="text-xs text-gray-500">Mula: ${trip.startTime || '-'}</div>
                     </div>
-                    <div class="text-sm text-gray-600 grid grid-cols-2 gap-2 mb-2">
-                        <div><i class="fa-solid fa-gauge-high w-4 text-gray-400"></i> Odo Mula: ${trip.startOdometer} km</div>
-                        <div><i class="fa-solid fa-flag-checkered w-4 text-gray-400"></i> Odo Tamat: ${trip.endOdometer || '-'} km</div>
+                    <div class="text-sm text-gray-600 grid grid-cols-2 gap-2 mb-2 bg-white rounded border border-gray-100 p-2">
+                        <div><i class="fa-solid fa-gauge-high w-4 text-gray-400"></i> Mula: <span class="font-medium">${trip.startOdometer} km</span></div>
+                        <div><i class="fa-solid fa-flag-checkered w-4 text-gray-400"></i> Tamat: <span class="font-medium">${trip.endOdometer || '-'} km</span></div>
                     </div>
-                    ${!isOngoing ? `<div class="text-xs text-blue-600 font-bold mb-2"><i class="fa-solid fa-road mr-1"></i> Jarak: ${trip.endOdometer - trip.startOdometer} km</div>` : ''}
+                    <div class="text-xs text-gray-500 bg-gray-100 p-2.5 rounded-md mb-2">
+                        <span class="font-semibold block text-gray-700">Tujuan: ${trip.purpose || '-'}</span>
+                        <span class="block">Destinasi: ${trip.destination || '-'}</span>
+                    </div>
+                    ${!isOngoing ? `
+                    <div class="flex justify-between items-center mt-3 pt-3 border-t border-gray-100">
+                        <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded"><i class="fa-solid fa-road mr-1"></i> ${trip.endOdometer - trip.startOdometer} km</span>
+                        <button onclick="analyzeTrip('${trip.id}')" class="text-xs font-bold bg-purple-100 text-purple-700 hover:bg-purple-200 border border-purple-200 px-3 py-1.5 rounded-md shadow-sm transition flex items-center">
+                            <i class="fa-solid fa-wand-magic-sparkles mr-1.5 text-purple-500"></i> Analisis AI
+                        </button>
+                    </div>` : ''}
                 `;
                 listEl.appendChild(li);
             });
@@ -306,10 +423,14 @@
                         
                         let detectedPlate = decodedText;
                         if(decodedText.includes('?plat=')) {
-                            const url = new URL(decodedText);
-                            detectedPlate = url.searchParams.get('plat');
+                            try {
+                                const url = new URL(decodedText);
+                                detectedPlate = url.searchParams.get('plat');
+                            } catch(e) {
+                                detectedPlate = decodedText.split('?plat=')[1];
+                            }
                         }
-                        handleQRScan(detectedPlate.trim().toUpperCase());
+                        handleQRScan(detectedPlate);
                     },
                     () => {}
                 ).then(() => {
@@ -330,16 +451,14 @@
 
         window.handleQRScan = (vehicleId) => {
             if(!vehicleId) return;
-            vehicleId = vehicleId.trim().toUpperCase();
-            
-            // Cari rekod ongoing yang sepadan dengan No Plat Kenderaan (Huruf Besar Sekata)
-            const existingTrip = activeTrips.find(t => t.vehicleId.toUpperCase().trim() === vehicleId && t.status.toLowerCase().trim() === 'ongoing');
+            const cleanVehicleId = vehicleId.toString().toUpperCase().replace(/\s+/g, '').trim();
+            const existingTrip = activeTrips.find(t => t.vehicleId.toString().toUpperCase().replace(/\s+/g, '').trim() === cleanVehicleId);
 
-            document.getElementById('tf-vehicle-id').value = vehicleId;
-            document.getElementById('form-vehicle-id').innerText = `ID Kenderaan: ${vehicleId}`;
+            document.getElementById('tf-vehicle-id').value = cleanVehicleId;
+            document.getElementById('form-vehicle-id').innerText = `ID Kenderaan: ${cleanVehicleId}`;
 
             if (existingTrip) {
-                // MOD TAMAT PERJALANAN (Wujud rekod ongoing)
+                // MOD TAMAT PERJALANAN 
                 document.getElementById('form-title').innerText = "Tamat Perjalanan";
                 document.getElementById('lbl-odometer').innerText = `Odometer SELEPAS Guna (Mula tadi: ${existingTrip.startOdometer} km)`;
                 document.getElementById('tf-action-type').value = "end";
@@ -350,6 +469,9 @@
                 document.getElementById('tf-destination').removeAttribute('required');
             } else {
                 // MOD MULA PERJALANAN
+                if (activeTrips.length > 0) {
+                     showModal("Perhatian", `Perjalanan aktif anda adalah untuk kenderaan ${activeTrips[0].vehicleId}, tetapi anda mengimbas QR untuk ${cleanVehicleId}. Borang mula perjalanan baharu dibuka.`, "info");
+                }
                 document.getElementById('form-title').innerText = "Mula Perjalanan";
                 document.getElementById('lbl-odometer').innerText = "Bacaan Odometer SEBELUM Guna (km)";
                 document.getElementById('tf-action-type').value = "start";
@@ -375,7 +497,7 @@
 
             const payload = {
                 action: document.getElementById('tf-action-type').value,
-                vehicleId: document.getElementById('tf-vehicle-id').value.toUpperCase(),
+                vehicleId: document.getElementById('tf-vehicle-id').value,
                 odometer: document.getElementById('tf-odometer').value,
                 tripId: document.getElementById('tf-trip-id').value,
                 purpose: document.getElementById('tf-purpose').value,
@@ -396,7 +518,6 @@
                 
                 if(result.status === 'success') {
                     showModal("Berjaya", "Data berjaya disimpan!", "success");
-                    // Cuci URL parameter supaya pautan bersih semula (?plat= dibuang)
                     window.history.pushState({}, document.title, window.location.pathname);
                     await fetchTrips();
                     switchView('dashboard');
@@ -411,11 +532,11 @@
         };
 
         window.generateQR = () => {
-            const plateNo = document.getElementById('gen-plate-no').value.trim().toUpperCase();
+            const plateNo = document.getElementById('gen-plate-no').value.trim().toUpperCase().replace(/\s+/g, '');
             if(!plateNo) { showModal("Ralat", "Sila masukkan No. Plat.", "error"); return; }
             
             const displayDiv = document.getElementById('qrcode-display');
-            displayDiv.innerHTML = ''; // Pastikan div dikosongkan dahulu
+            displayDiv.innerHTML = ''; 
             displayDiv.classList.remove('hidden');
 
             const baseURL = window.location.origin + window.location.pathname;
@@ -440,9 +561,9 @@
 
             if (scannedPlate) {
                 toggleLoading(true);
-                await fetchTrips(); // Muat turun senarai terkini untuk tahu ada status 'ongoing' atau tidak
+                await fetchTrips(); 
                 toggleLoading(false);
-                handleQRScan(scannedPlate.toUpperCase());
+                handleQRScan(scannedPlate);
             } else {
                 switchView('dashboard');
             }
