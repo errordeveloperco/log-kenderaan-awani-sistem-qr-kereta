@@ -14,6 +14,9 @@
     <!-- HTML5 QR Code Scanner -->
     <script src="https://unpkg.com/html5-qrcode"></script>
 
+    <!-- QRCode Generator -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .tab-active { color: #2563eb; border-bottom: 2px solid #2563eb; }
@@ -125,6 +128,29 @@
                     <ul id="user-trips-list" class="divide-y divide-gray-200">
                         <li class="p-4 text-center text-gray-500 text-sm">Sila simpan profil untuk melihat sejarah anda.</li>
                     </ul>
+                </div>
+            </div>
+
+            <!-- Admin Section Toggle -->
+            <div class="max-w-md mx-auto mt-8 pt-6 border-t border-gray-200 pb-8">
+                <button onclick="toggleAdminPanel()" class="w-full text-xs font-semibold text-gray-400 hover:text-gray-600 flex items-center justify-center transition">
+                    <i class="fa-solid fa-lock mr-2"></i> Ruangan Pentadbir
+                </button>
+
+                <!-- Admin Panel (Hidden) -->
+                <div id="admin-panel" class="hidden mt-4 bg-gray-800 p-5 rounded-lg shadow-md text-white">
+                    <h3 class="text-md font-bold mb-2 flex items-center">
+                        <i class="fa-solid fa-shield-halved mr-2 text-blue-400"></i> Penjana QR Kenderaan
+                    </h3>
+                    <p class="text-xs text-gray-300 mb-4">Jana kod QR pintar yang mengandungi pautan automatik. Boleh dicetak dan digunakan berulang kali.</p>
+                    
+                    <input type="text" id="gen-plate-no" placeholder="Cth: WAA1234" class="w-full px-3 py-2 border border-gray-600 bg-gray-700 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3 uppercase placeholder-gray-400">
+                    <button onclick="generateQR()" class="bg-blue-600 text-white font-bold px-4 py-2.5 rounded-md hover:bg-blue-500 w-full mb-4 transition shadow-lg flex justify-center items-center">
+                        <i class="fa-solid fa-qrcode mr-2"></i> Jana Kod QR
+                    </button>
+
+                    <div id="qrcode-display" class="flex justify-center mb-2 p-4 bg-white rounded shadow-sm hidden"></div>
+                    <p id="qr-label" class="font-bold text-lg mb-2 hidden text-center uppercase tracking-widest text-white"></p>
                 </div>
             </div>
         </div>
@@ -331,18 +357,52 @@
                     <div class="text-xs text-gray-500 bg-gray-100 p-2.5 rounded-md mb-2">
                         <span class="font-semibold block text-gray-700">Tujuan: ${trip.purpose || '-'}</span>
                     </div>
-                    ${isOngoing ? `
-                    <div class="flex justify-end items-center mt-2 pt-2 border-t border-gray-100">
-                        <button onclick="endTripDirectly('${trip.id}')" class="text-xs font-bold bg-yellow-50 text-yellow-700 hover:bg-yellow-100 border border-yellow-300 px-3 py-1.5 rounded-md shadow-sm transition flex items-center">
-                            <i class="fa-solid fa-flag-checkered mr-1.5 text-yellow-600"></i> Tamatkan
-                        </button>
-                    </div>` : `
-                    <div class="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
-                        <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded"><i class="fa-solid fa-road mr-1"></i> ${trip.endOdometer - trip.startOdometer} km</span>
-                    </div>`}
                 `;
                 listEl.appendChild(li);
             });
+        };
+
+        // KAWALAN PANEL PENTADBIR (ADMIN)
+        window.toggleAdminPanel = () => {
+            const panel = document.getElementById('admin-panel');
+            if (panel.classList.contains('hidden')) {
+                // PIN ditetapkan kepada '1234'
+                const pin = prompt("Sila masukkan PIN Pentadbir:");
+                if (pin === "1234") { 
+                    panel.classList.remove('hidden');
+                } else if (pin !== null) {
+                    showModal("Akses Ditolak", "PIN Pentadbir tidak sah.", "error");
+                }
+            } else {
+                panel.classList.add('hidden');
+                document.getElementById('qrcode-display').classList.add('hidden');
+                document.getElementById('qr-label').classList.add('hidden');
+                document.getElementById('gen-plate-no').value = '';
+            }
+        };
+
+        window.generateQR = () => {
+            const plateNo = document.getElementById('gen-plate-no').value.trim().toUpperCase().replace(/\s+/g, '');
+            if(!plateNo) { showModal("Ralat", "Sila masukkan No. Plat kenderaan.", "error"); return; }
+            
+            const displayDiv = document.getElementById('qrcode-display');
+            displayDiv.innerHTML = ''; 
+            displayDiv.classList.remove('hidden');
+
+            // Hasilkan URL Pintar yang kekal
+            const baseURL = window.location.origin + window.location.pathname;
+            const smartURL = baseURL + "?plat=" + encodeURIComponent(plateNo);
+
+            new QRCode(displayDiv, { 
+                text: smartURL, 
+                width: 200, 
+                height: 200, 
+                correctLevel : QRCode.CorrectLevel.M 
+            });
+
+            const label = document.getElementById('qr-label');
+            label.innerText = plateNo; 
+            label.classList.remove('hidden');
         };
 
         window.cancelAndHome = () => {
@@ -400,17 +460,6 @@
             document.getElementById('view-trip-form').classList.remove('hidden');
         };
 
-        // BUKA SCANNER SECARA AUTOMATIK
-        window.goToScannerAndStart = () => {
-            switchView('scanner');
-            setTimeout(() => {
-                const btn = document.getElementById('btn-start-scan');
-                if(btn && !btn.classList.contains('hidden')) {
-                    btn.click();
-                }
-            }, 500); 
-        };
-
         window.fetchTrips = async () => {
             if(SCRIPT_URL === "SILA_MASUKKAN_URL_WEB_APP_ANDA_DI_SINI") return;
             const syncIcon = document.getElementById('sync-icon');
@@ -424,7 +473,7 @@
                 window.activeTrips = data.filter(t => t.status.toLowerCase().replace(/\s+/g, '') === 'ongoing');
                 
                 updateDashboardUI(data);
-                updateUserHistoryUI(); // Kemas kini juga senarai di tab Akaun
+                updateUserHistoryUI(); 
                 return data;
             } catch (error) {
                 console.error("Error:", error);
@@ -671,7 +720,7 @@
 
         window.addEventListener('DOMContentLoaded', async () => {
             initScanner();
-            loadProfile(); // Muat data profil apabila aplikasi dibuka
+            loadProfile(); 
             
             const urlParams = new URLSearchParams(window.location.search);
             const scannedPlate = urlParams.get('plat');
