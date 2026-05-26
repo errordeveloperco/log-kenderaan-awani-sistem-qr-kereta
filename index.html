@@ -13,9 +13,6 @@
     
     <!-- HTML5 QR Code Scanner -->
     <script src="https://unpkg.com/html5-qrcode"></script>
-    
-    <!-- QRCode Generator -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
@@ -67,8 +64,8 @@
                     </div>
                 </div>
                 <div class="mt-4">
-                    <button onclick="goToScannerAndStart()" class="w-full text-sm bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2.5 rounded shadow flex items-center justify-center font-bold transition">
-                        <i class="fa-solid fa-qrcode mr-2"></i> Imbas QR untuk Tamat Perjalanan
+                    <button onclick="endActiveTripDirectly()" class="w-full text-sm bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2.5 rounded shadow flex items-center justify-center font-bold transition">
+                        <i class="fa-solid fa-flag-checkered mr-2"></i> Tamat Perjalanan Sekarang
                     </button>
                 </div>
             </div>
@@ -91,6 +88,44 @@
             <div class="flex gap-2 w-full max-w-sm">
                 <button id="btn-start-scan" class="flex-1 bg-blue-600 text-white py-2.5 rounded shadow hover:bg-blue-700 font-bold">Mula Kamera Web</button>
                 <button id="btn-stop-scan" class="flex-1 bg-red-600 text-white py-2.5 rounded shadow hover:bg-red-700 font-bold hidden">Henti Kamera</button>
+            </div>
+        </div>
+
+        <!-- VIEW: ACCOUNT -->
+        <div id="view-account" class="view-section hidden">
+            <div class="bg-white p-5 rounded-lg shadow-md max-w-md mx-auto mt-4">
+                <div class="text-center mb-6">
+                    <div class="inline-flex items-center justify-center w-20 h-20 bg-blue-100 rounded-full mb-3">
+                        <i class="fa-solid fa-user-tie text-4xl text-blue-600"></i>
+                    </div>
+                    <h2 class="text-xl font-bold text-gray-800">Profil Pemandu</h2>
+                    <p class="text-xs text-gray-500 mt-1">Maklumat ini akan disimpan secara tempatan dan disertakan secara automatik dalam setiap log perjalanan.</p>
+                </div>
+
+                <form onsubmit="saveProfile(event)">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nama Penuh</label>
+                        <input type="text" id="acc-name" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Cth: Ahmad Albab">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">ID Pekerja / No. Telefon</label>
+                        <input type="text" id="acc-id" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Cth: EMP001">
+                    </div>
+                    
+                    <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2.5 px-4 rounded-md hover:bg-blue-700 transition shadow flex justify-center items-center">
+                        <i class="fa-solid fa-floppy-disk mr-2"></i> Simpan Profil
+                    </button>
+                </form>
+            </div>
+
+            <!-- Sejarah Kenderaan Pengguna -->
+            <div class="max-w-md mx-auto mt-6">
+                <h3 class="text-lg font-bold text-gray-800 mb-3 px-1"><i class="fa-solid fa-clock-rotate-left mr-2 text-blue-600"></i>Sejarah Perjalanan Saya</h3>
+                <div class="bg-white rounded-lg shadow overflow-hidden mb-6">
+                    <ul id="user-trips-list" class="divide-y divide-gray-200">
+                        <li class="p-4 text-center text-gray-500 text-sm">Sila simpan profil untuk melihat sejarah anda.</li>
+                    </ul>
+                </div>
             </div>
         </div>
 
@@ -153,20 +188,6 @@
             </div>
         </div>
 
-        <!-- VIEW: VEHICLE QR GENERATOR -->
-        <div id="view-generator" class="view-section hidden">
-            <div class="bg-white p-5 rounded-lg shadow-md max-w-md mx-auto text-center">
-                <h2 class="text-lg font-bold mb-4">Jana Kod QR Kenderaan</h2>
-                <p class="text-sm text-gray-500 mb-4">Masukkan No Plat untuk menjana kod QR unik kenderaan anda.</p>
-                
-                <input type="text" id="gen-plate-no" placeholder="Cth: WAA1234" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4 uppercase">
-                <button onclick="generateQR()" class="bg-blue-600 text-white font-bold px-4 py-2.5 rounded-md hover:bg-blue-700 w-full mb-6">Jana Kod QR</button>
-
-                <div id="qrcode-display" class="flex justify-center mb-4 p-4 bg-gray-50 rounded hidden"></div>
-                <p id="qr-label" class="font-bold text-lg mb-4 hidden"></p>
-            </div>
-        </div>
-
     </main>
 
     <!-- Bottom Navigation -->
@@ -181,9 +202,9 @@
             </div>
             <span class="text-xs font-medium mt-7">Imbas QR</span>
         </button>
-        <button onclick="switchView('generator')" class="nav-btn tab-inactive flex-1 py-3 flex flex-col items-center" data-target="generator">
-            <i class="fa-solid fa-car text-lg mb-1"></i>
-            <span class="text-xs font-medium">Kenderaan</span>
+        <button onclick="switchView('account')" class="nav-btn tab-inactive flex-1 py-3 flex flex-col items-center" data-target="account">
+            <i class="fa-solid fa-user text-lg mb-1"></i>
+            <span class="text-xs font-medium">Akaun</span>
         </button>
     </nav>
 
@@ -225,7 +246,6 @@
         let html5QrCode;
         let activeTrips = []; 
         let allTrips = [];
-        let qrcodeInstance = null;
         
         // Kekunci API untuk AI Gemini
         const apiKey = ""; 
@@ -248,6 +268,81 @@
             const overlay = document.getElementById('loading-overlay');
             if (show) overlay.classList.remove('hidden');
             else overlay.classList.add('hidden');
+        };
+
+        window.saveProfile = (e) => {
+            e.preventDefault();
+            const name = document.getElementById('acc-name').value.trim();
+            const id = document.getElementById('acc-id').value.trim();
+            localStorage.setItem('driverName', name);
+            localStorage.setItem('driverId', id);
+            showModal("Berjaya", "Profil pemandu telah disimpan pada peranti ini.", "success");
+            updateUserHistoryUI();
+        };
+
+        const loadProfile = () => {
+            const name = localStorage.getItem('driverName');
+            const id = localStorage.getItem('driverId');
+            if(name) document.getElementById('acc-name').value = name;
+            if(id) document.getElementById('acc-id').value = id;
+            updateUserHistoryUI();
+        };
+
+        const updateUserHistoryUI = () => {
+            const listEl = document.getElementById('user-trips-list');
+            if (!listEl) return;
+
+            const driverName = localStorage.getItem('driverName');
+            const driverId = localStorage.getItem('driverId');
+
+            if (!driverName && !driverId) {
+                listEl.innerHTML = '<li class="p-6 text-center text-gray-500 text-sm">Sila simpan profil anda di atas untuk melihat sejarah perjalanan.</li>';
+                return;
+            }
+
+            // Tapis data perjalanan berdasarkan cap nama pemandu pada 'notes'
+            const driverIdentifier = `[Pemandu: ${driverName || 'Tanpa Nama'} (${driverId || '-'})]`;
+            const userTrips = window.allTrips.filter(trip => trip.notes && trip.notes.includes(driverIdentifier));
+
+            listEl.innerHTML = '';
+
+            if (userTrips.length === 0) {
+                listEl.innerHTML = '<li class="p-6 text-center text-gray-500 text-sm">Tiada rekod perjalanan ditemui untuk akaun anda.</li>';
+                return;
+            }
+
+            userTrips.forEach(trip => {
+                const li = document.createElement('li');
+                li.className = "p-4 hover:bg-gray-50 transition";
+                const isOngoing = trip.status.toLowerCase().replace(/\s+/g, '') === 'ongoing';
+                const statusBadge = isOngoing 
+                    ? `<span class="bg-yellow-100 text-yellow-800 text-xs font-semibold px-2 py-0.5 rounded ml-2 shadow-sm">Sedang Jalan</span>`
+                    : `<span class="bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded ml-2 shadow-sm">Selesai</span>`;
+
+                li.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="font-bold text-gray-800">${trip.vehicleId} ${statusBadge}</div>
+                        <div class="text-xs text-gray-500">Mula: ${trip.startTime || '-'}</div>
+                    </div>
+                    <div class="text-sm text-gray-600 grid grid-cols-2 gap-2 mb-2 bg-white rounded border border-gray-100 p-2">
+                        <div><i class="fa-solid fa-gauge-high w-4 text-gray-400"></i> Mula: <span class="font-medium">${trip.startOdometer} km</span></div>
+                        <div><i class="fa-solid fa-flag-checkered w-4 text-gray-400"></i> Tamat: <span class="font-medium">${trip.endOdometer || '-'} km</span></div>
+                    </div>
+                    <div class="text-xs text-gray-500 bg-gray-100 p-2.5 rounded-md mb-2">
+                        <span class="font-semibold block text-gray-700">Tujuan: ${trip.purpose || '-'}</span>
+                    </div>
+                    ${isOngoing ? `
+                    <div class="flex justify-end items-center mt-2 pt-2 border-t border-gray-100">
+                        <button onclick="endTripDirectly('${trip.id}')" class="text-xs font-bold bg-yellow-50 text-yellow-700 hover:bg-yellow-100 border border-yellow-300 px-3 py-1.5 rounded-md shadow-sm transition flex items-center">
+                            <i class="fa-solid fa-flag-checkered mr-1.5 text-yellow-600"></i> Tamatkan
+                        </button>
+                    </div>` : `
+                    <div class="flex justify-between items-center mt-2 pt-2 border-t border-gray-100">
+                        <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded"><i class="fa-solid fa-road mr-1"></i> ${trip.endOdometer - trip.startOdometer} km</span>
+                    </div>`}
+                `;
+                listEl.appendChild(li);
+            });
         };
 
         window.cancelAndHome = () => {
@@ -274,6 +369,37 @@
             }
         };
 
+        window.endActiveTripDirectly = () => {
+            if (activeTrips.length > 0) {
+                endTripDirectly(activeTrips[0].id);
+            }
+        };
+
+        window.endTripDirectly = (tripId) => {
+            const trip = window.allTrips.find(t => t.id === tripId);
+            if (!trip) return;
+
+            document.getElementById('form-title').innerText = "Tamat Perjalanan";
+            document.getElementById('lbl-odometer').innerText = `Odometer SELEPAS Guna (Mula tadi: ${trip.startOdometer} km)`;
+            
+            document.getElementById('tf-vehicle-id').value = trip.vehicleId;
+            document.getElementById('form-vehicle-id').innerText = `ID Kenderaan: ${trip.vehicleId}`;
+            document.getElementById('tf-action-type').value = "end";
+            document.getElementById('tf-trip-id').value = trip.id;
+            
+            document.getElementById('fields-start').classList.add('hidden');
+            document.getElementById('fields-end').classList.remove('hidden');
+            document.getElementById('tf-purpose').removeAttribute('required');
+            document.getElementById('tf-destination').removeAttribute('required');
+            
+            document.getElementById('tf-odometer').value = '';
+            document.getElementById('tf-condition').value = 'Baik';
+            document.getElementById('tf-notes').value = '';
+
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            document.getElementById('view-trip-form').classList.remove('hidden');
+        };
+
         // BUKA SCANNER SECARA AUTOMATIK
         window.goToScannerAndStart = () => {
             switchView('scanner');
@@ -298,6 +424,7 @@
                 window.activeTrips = data.filter(t => t.status.toLowerCase().replace(/\s+/g, '') === 'ongoing');
                 
                 updateDashboardUI(data);
+                updateUserHistoryUI(); // Kemas kini juga senarai di tab Akaun
                 return data;
             } catch (error) {
                 console.error("Error:", error);
@@ -399,13 +526,18 @@
                         <span class="font-semibold block text-gray-700">Tujuan: ${trip.purpose || '-'}</span>
                         <span class="block">Destinasi: ${trip.destination || '-'}</span>
                     </div>
-                    ${!isOngoing ? `
+                    ${isOngoing ? `
+                    <div class="flex justify-end items-center mt-3 pt-3 border-t border-gray-100">
+                        <button onclick="endTripDirectly('${trip.id}')" class="text-xs font-bold bg-yellow-50 text-yellow-700 hover:bg-yellow-100 border border-yellow-300 px-3 py-1.5 rounded-md shadow-sm transition flex items-center">
+                            <i class="fa-solid fa-flag-checkered mr-1.5 text-yellow-600"></i> Tamatkan Perjalanan
+                        </button>
+                    </div>` : `
                     <div class="flex justify-between items-center mt-3 pt-3 border-t border-gray-100">
                         <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded"><i class="fa-solid fa-road mr-1"></i> ${trip.endOdometer - trip.startOdometer} km</span>
                         <button onclick="analyzeTrip('${trip.id}')" class="text-xs font-bold bg-purple-100 text-purple-700 hover:bg-purple-200 border border-purple-200 px-3 py-1.5 rounded-md shadow-sm transition flex items-center">
                             <i class="fa-solid fa-wand-magic-sparkles mr-1.5 text-purple-500"></i> Analisis AI
                         </button>
-                    </div>` : ''}
+                    </div>`}
                 `;
                 listEl.appendChild(li);
             });
@@ -495,6 +627,12 @@
             e.preventDefault();
             toggleLoading(true);
 
+            // Ambil data profil dari local storage
+            const driverName = localStorage.getItem('driverName') || 'Tanpa Nama';
+            const driverId = localStorage.getItem('driverId') || '-';
+            const originalNotes = document.getElementById('tf-notes').value;
+            const notesWithDriver = `[Pemandu: ${driverName} (${driverId})] ${originalNotes}`;
+
             const payload = {
                 action: document.getElementById('tf-action-type').value,
                 vehicleId: document.getElementById('tf-vehicle-id').value,
@@ -503,7 +641,7 @@
                 purpose: document.getElementById('tf-purpose').value,
                 destination: document.getElementById('tf-destination').value,
                 condition: document.getElementById('tf-condition').value,
-                notes: document.getElementById('tf-notes').value
+                notes: notesWithDriver
             };
 
             try {
@@ -531,30 +669,9 @@
             }
         };
 
-        window.generateQR = () => {
-            const plateNo = document.getElementById('gen-plate-no').value.trim().toUpperCase().replace(/\s+/g, '');
-            if(!plateNo) { showModal("Ralat", "Sila masukkan No. Plat.", "error"); return; }
-            
-            const displayDiv = document.getElementById('qrcode-display');
-            displayDiv.innerHTML = ''; 
-            displayDiv.classList.remove('hidden');
-
-            const baseURL = window.location.origin + window.location.pathname;
-            const smartURL = baseURL + "?plat=" + encodeURIComponent(plateNo);
-
-            new QRCode(displayDiv, { 
-                text: smartURL, 
-                width: 200, 
-                height: 200, 
-                correctLevel : QRCode.CorrectLevel.M 
-            });
-
-            const label = document.getElementById('qr-label');
-            label.innerText = plateNo; label.classList.remove('hidden');
-        };
-
         window.addEventListener('DOMContentLoaded', async () => {
             initScanner();
+            loadProfile(); // Muat data profil apabila aplikasi dibuka
             
             const urlParams = new URLSearchParams(window.location.search);
             const scannedPlate = urlParams.get('plat');
